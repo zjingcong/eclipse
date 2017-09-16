@@ -10,7 +10,7 @@ OUTPUTPATH = '/DPA/wookie/dpa/projects/eclipse/rnd/prods/water_surface_obj'
 
 # setting
 start = 1
-end = 2
+end = 120
 surface_name = 'water_surface'
 QUEUE = 'brie'
 
@@ -103,8 +103,6 @@ def submit_task():
 
 # exporting things
 print "Exporting {} displacement map to mesh obj file...".format(surface_name)
-create_mel()
-create_shell()
 if create_mel() and create_shell():
     print '-' * 100
     submit_task()
