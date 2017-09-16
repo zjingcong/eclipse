@@ -3,7 +3,7 @@ import os
 import pymel.core as pm
 
 # path
-OBJPATH = '/DPA/wookie/dpa/projects/eclipse/rnd/ocean/gilliganTest/testAss'
+OBJPATH = '/DPA/wookie/dpa/projects/eclipse/rnd/prods/waterThing'
 
 
 def get_inputs():
