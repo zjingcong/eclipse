@@ -31,6 +31,15 @@ PRODNAME = ""
 PRODUCTSPATH = ""
 LLC = ""
 PATCHSIZE = ""
+
+# to match maya displacement map setting
+swell_typicalheight_mult = 1.0
+swell_cuspscale_mult = 1.0
+# for ewave simulation
+time_offset = 0
+ewave_capillary = 0.015
+ewave_trimalpha = 0.05
+
 # -------------------------------------------------------
 
 
@@ -41,11 +50,13 @@ def CreateWaterSims(name, wave_parms, ewave_llc, ewave_patch_size):
     swell_waves.set('oceantype', 'str("ochi")' )
     swell_waves.set('patchsize', '[ 4000.0, 4000.0 ]' )
     swell_waves.set('patchnxny', '[ 2048, 2048 ]' )
-    swell_waves.set('typicalheight', wave_parms.get('swell_waves').get('typicalheight') )
+
+    swell_waves.set('typicalheight', wave_parms.get('swell_waves').get('typicalheight') * swell_typicalheight_mult)
+    swell_waves.set('cuspscale', wave_parms.get('swell_waves').get('cuspscale') * swell_cuspscale_mult)
+
     swell_waves.set('travel', wave_parms.get('swell_waves').get('travel') )
     swell_waves.set('align', wave_parms.get('swell_waves').get('align') )
     swell_waves.set('direction', 90.0 )
-    swell_waves.set('cuspscale', wave_parms.get('swell_waves').get('cuspscale') )
     swell_waves.set('longest', wave_parms.get('swell_waves').get('longest') )
     swell_waves.set('shortest', wave_parms.get('swell_waves').get('shortest') )
     swell_waves.set('depth', wave_parms.get('swell_waves').get('depth') )
@@ -84,21 +95,20 @@ def CreateWaterSims(name, wave_parms, ewave_llc, ewave_patch_size):
     ewave_waves.set('llc', ewave_llc)
     ewave_waves.set('gravity',  9.8 )
     ewave_waves.set('depth', 10.0 )
-    ewave_waves.set('capillary', 0.015 )
-    ewave_waves.set('trimfraction',  0.1 )
-    ewave_waves.set('trimalpha', 0.05 )
     ewave_waves.set('displacementscale', 0.3 )
     ewave_waves.set('dohorizontal', True)
     ewave_waves.set('sourcescale', 1.0 )
     ewave_waves.set('ambientscale', 0.75*0.3 )
 
-    # ewave_waves.set('compute_whitecaps', True )
+### ewave parms
+    # ewave_waves.set('capillary', 0.015)
+    # ewave_waves.set('trimfraction', 0.1)
+    # ewave_waves.set('trimalpha', 0.05)
+    ewave_waves.set('capillary', ewave_capillary)
+    ewave_waves.set('trimfraction', 0.1)
+    ewave_waves.set('trimalpha', ewave_trimalpha)
+
     ewave_waves.set('compute_whitecaps', False)
-    # ewave_waves.set('whitecaps_llc', ewave_waves.get('llc') )
-    # ewave_waves.set('whitecaps_urc', '[20.0,20.0]' )
-    # ewave_waves.set('whitecaps_nxny', ewave_waves.get('patchnxny') )
-    # ewave_waves.set('whitecaps_halflife', 2.0 )
-    # ewave_waves.set('whitecaps_threshold', 0.89 )
 
     ewave_waves.generate_object()
     simscene.add_sim(ewave_waves)
@@ -147,6 +157,9 @@ def sim(input_frange, wave_parms, ewave_llc, ewave_patch_size):
     merged_ocean.generate_object()
     merged_ocean.verbose = True
 
+    # update ocean for offset time
+    merged_ocean.update(timestep * time_offset)
+
     ew = simscene.get_sim('thing_in_water_waves')
     sw = simscene.get_sim('swell_waves')
     pw = simscene.get_sim('small_waves')
@@ -160,19 +173,24 @@ def sim(input_frange, wave_parms, ewave_llc, ewave_patch_size):
     frame_list = frame_range.frames
     floatingThing_name = WATERTHING.split('/')[-1]
 
-    for f in range(1, frame_range.end + 1):
+    start_ewave_time = 1 + time_offset
+    # for f in range(1, frame_range.end + 1):
+    for f in xrange(start_ewave_time, frame_range.end + 1):
         LogIt(__file__, colors.color_magenta + "\n\n********************************** F R A M E  " + str(f) + " *****************************************\n" + colors.color_white)
         thirsty.F = int(f)
         LogIt(__file__, colors.color_yellow + "\n\n\tS I M U L A T I O N\n" + colors.color_white)
         merged_ocean.update(timestep)
-        water_thing = RetrieveThingInWater(f)
+
+        obj_time = f
+        if obj_time < 1:
+            obj_time = 1
+
+        water_thing = RetrieveThingInWater(obj_time)
         ew.set('height_source_geom', water_thing)
         ew.set('compute_height_source', True)
         ew.update(timestep)
         LogIt(__file__, colors.color_yellow + "\n\n\tS I M U L A T I O N   F I N I S H E D\n" + colors.color_white)
         if f in frame_list:
-            # sw.write_displacement(os.path.join(PRODUCTSPATH, 'sim/{name}_swell_wave.{f}.exr'.format(name=PRODNAME, f=util.formattedFrame(f))))
-            # pw.write_displacement(os.path.join(PRODUCTSPATH, 'sim/{name}_small_wave.{f}.exr'.format(name=PRODNAME, f=util.formattedFrame(f))))
             ew.write_displacement(os.path.join(PRODUCTSPATH, 'sim/{name}_ewave_{waterthing}.{f}.exr'.format(name=PRODNAME, waterthing=floatingThing_name, f=util.formattedFrame(f))))
 
     endJob()
@@ -181,7 +199,7 @@ def sim(input_frange, wave_parms, ewave_llc, ewave_patch_size):
 def get_argvs():
     parser = argparse.ArgumentParser(description="Wave parms setting.")
     parser.add_argument('-w', '--waterthing', type=str, dest='w', help='Input water thing path.',
-                        default='/DPA/wookie/dpa/projects/eclipse/rnd/prods/waterThing/floatingObj_tri')
+                        default='/DPA/wookie/dpa/projects/eclipse/rnd/prods/waterThing/float1float2_tri')
     parser.add_argument('-pn', '--prodname', type=str, dest='pn',
                         help='Input products name.', default='wave_floating')
     parser.add_argument('-pp', '--prodpath', type=str, dest='pp',
@@ -198,6 +216,15 @@ def get_argvs():
     # for maya custom ewave_patch
     parser.add_argument('-scale', type=str, dest='scale', help='Input Maya ewave patch scale.', default='[40.0, 40.0]')
     parser.add_argument('-trans', type=str, dest='trans', help='Input Maya ewave patch translate.', default='[0.0, 0.0]')
+    parser.add_argument('-height', type=float, dest='height', help='Input Maya swell height mult parms.', default=1.0)
+    parser.add_argument('-cusp', type=float, dest='cusp', help='Input Maya swell cuspscale mult parms',
+                        default=1.0)
+    parser.add_argument('-timeoffset', type=int, dest='timeoffset', help='Input Maya ewave simulation time offset',
+                        default=0)
+    parser.add_argument('-capillary', type=float, dest='capillary', help='Input Maya ewave simulation capillary',
+                        default=0.015)
+    parser.add_argument('-trimalpha', type=float, dest='trimalpha', help='Input Maya ewave simulation trimalpha',
+                        default=0.05)
 
     args = parser.parse_args()
 
@@ -237,6 +264,17 @@ if __name__ == '__main__':
     with open(wave_parms_path) as jsonfile:
         wave_parms = json.load(jsonfile)
 
-    # CreateWaterSims('water floating', wave_parms, LLC, PATCHSIZE)
+    swell_cuspscale_mult = args.cusp
+    swell_typicalheight_mult = args.height
+    time_offset = args.timeoffset
+    ewave_capillary = args.capillary
+    ewave_trimalpha = args.trimalpha
+
+    print "swell_cuspscale_mult: ", swell_cuspscale_mult
+    print "swell_typicalheight_mult: ", swell_typicalheight_mult
+    print "time_offset: ", time_offset
+    print "ewave_capillary: ", ewave_capillary
+    print "ewave_trimalpha: ", ewave_trimalpha
+
     # do simulation and export displacement map for swell/small/ewave sim
     sim(input_frange, wave_parms, LLC, PATCHSIZE)
