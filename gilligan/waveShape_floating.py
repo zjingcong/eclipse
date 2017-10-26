@@ -31,6 +31,7 @@ PRODNAME = ""
 PRODUCTSPATH = ""
 LLC = ""
 PATCHSIZE = ""
+SIMSTART = 1
 
 # to match maya displacement map setting
 swell_typicalheight_mult = 1.0
@@ -132,7 +133,7 @@ def RetrieveThingInWater(f):
 #
 
 
-def sim(input_frange, wave_parms, ewave_llc, ewave_patch_size):
+def sim(input_frange, wave_parms, ewave_llc, ewave_patch_size, simstart):
     beginJob()
 
     # thirsty.FPS = 30.0
@@ -199,7 +200,7 @@ def sim(input_frange, wave_parms, ewave_llc, ewave_patch_size):
 def get_argvs():
     parser = argparse.ArgumentParser(description="Wave parms setting.")
     parser.add_argument('-w', '--waterthing', type=str, dest='w', help='Input water thing path.',
-                        default='/DPA/wookie/dpa/projects/eclipse/rnd/prods/waterThing/float1float2_tri')
+                        default='/DPA/wookie/dpa/projects/eclipse/rnd/prods/waterThing/animfloat2_tri')
     parser.add_argument('-pn', '--prodname', type=str, dest='pn',
                         help='Input products name.', default='wave_floating')
     parser.add_argument('-pp', '--prodpath', type=str, dest='pp',
@@ -225,6 +226,7 @@ def get_argvs():
                         default=0.015)
     parser.add_argument('-trimalpha', type=float, dest='trimalpha', help='Input Maya ewave simulation trimalpha',
                         default=0.05)
+    parser.add_argument('-simstart', type=int, dest='simstart', help='Sim start time.')
 
     args = parser.parse_args()
 
@@ -239,6 +241,7 @@ if __name__ == '__main__':
     PRODUCTSPATH = args.pp
     # LLC = args.llc
     # PATCHSIZE = args.patch
+    SIMSTART = args.simstart
 
     input_frange = args.f
     wave_parms_path = args.parms
@@ -275,6 +278,7 @@ if __name__ == '__main__':
     print "time_offset: ", time_offset
     print "ewave_capillary: ", ewave_capillary
     print "ewave_trimalpha: ", ewave_trimalpha
+    print "simstart: ", SIMSTART
 
     # do simulation and export displacement map for swell/small/ewave sim
-    sim(input_frange, wave_parms, LLC, PATCHSIZE)
+    sim(input_frange, wave_parms, LLC, PATCHSIZE, SIMSTART)
