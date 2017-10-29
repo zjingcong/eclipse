@@ -144,6 +144,7 @@ def sim(input_frange, wave_parms, ewave_llc, ewave_patch_size, simstart):
     frame_range = frange.Frange(input_frange)
 
     thirsty.F = 1
+    # thirsty.F = simstart
 
     simscene = CreateWaterSims('water floating', wave_parms, ewave_llc, ewave_patch_size)
     simscene.set('frame', 'thirsty.F' )
@@ -159,7 +160,8 @@ def sim(input_frange, wave_parms, ewave_llc, ewave_patch_size, simstart):
     merged_ocean.verbose = True
 
     # update ocean for offset time
-    merged_ocean.update(timestep * time_offset)
+    current_time = simstart - 1
+    merged_ocean.update(current_time + timestep * time_offset)
 
     ew = simscene.get_sim('thing_in_water_waves')
     sw = simscene.get_sim('swell_waves')
@@ -174,7 +176,8 @@ def sim(input_frange, wave_parms, ewave_llc, ewave_patch_size, simstart):
     frame_list = frame_range.frames
     floatingThing_name = WATERTHING.split('/')[-1]
 
-    start_ewave_time = 1 + time_offset
+    # start_ewave_time = 1 + time_offset
+    start_ewave_time = simstart + time_offset
     # for f in range(1, frame_range.end + 1):
     for f in xrange(start_ewave_time, frame_range.end + 1):
         LogIt(__file__, colors.color_magenta + "\n\n********************************** F R A M E  " + str(f) + " *****************************************\n" + colors.color_white)
@@ -183,8 +186,8 @@ def sim(input_frange, wave_parms, ewave_llc, ewave_patch_size, simstart):
         merged_ocean.update(timestep)
 
         obj_time = f
-        if obj_time < 1:
-            obj_time = 1
+        if obj_time < simstart:
+            obj_time = simstart
 
         water_thing = RetrieveThingInWater(obj_time)
         ew.set('height_source_geom', water_thing)
