@@ -160,8 +160,9 @@ def sim(input_frange, wave_parms, ewave_llc, ewave_patch_size, simstart):
     merged_ocean.verbose = True
 
     # update ocean for offset time
-    current_time = simstart - 1
-    merged_ocean.update(current_time + timestep * time_offset)
+    # current_time = simstart - 1
+    # merged_ocean.update(current_time + timestep * time_offset)
+    merged_ocean.update(timestep * time_offset)
 
     ew = simscene.get_sim('thing_in_water_waves')
     sw = simscene.get_sim('swell_waves')
@@ -177,9 +178,9 @@ def sim(input_frange, wave_parms, ewave_llc, ewave_patch_size, simstart):
     floatingThing_name = WATERTHING.split('/')[-1]
 
     # start_ewave_time = 1 + time_offset
-    start_ewave_time = simstart + time_offset
-    # for f in range(1, frame_range.end + 1):
-    for f in xrange(start_ewave_time, frame_range.end + 1):
+    # start_ewave_time = simstart + time_offset
+    for f in range(1, frame_range.end + 1):
+    # for f in xrange(start_ewave_time, frame_range.end + 1):
         LogIt(__file__, colors.color_magenta + "\n\n********************************** F R A M E  " + str(f) + " *****************************************\n" + colors.color_white)
         thirsty.F = int(f)
         LogIt(__file__, colors.color_yellow + "\n\n\tS I M U L A T I O N\n" + colors.color_white)
