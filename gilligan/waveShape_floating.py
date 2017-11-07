@@ -40,17 +40,21 @@ swell_cuspscale_mult = 1.0
 time_offset = 0
 ewave_capillary = 0.015
 ewave_trimalpha = 0.05
+# substep
+substep = 1
 
 # -------------------------------------------------------
 
 
-def CreateWaterSims(name, wave_parms, ewave_llc, ewave_patch_size):
+def CreateWaterSims(name, wave_parms, ewave_llc, ewave_patch_size, ambientscale, sourcescale, displacementscale):
     simscene = scene.Scene(name)
 
     swell_waves = wssim.WaveSurferSim('swell_waves')
     swell_waves.set('oceantype', 'str("ochi")' )
     swell_waves.set('patchsize', '[ 4000.0, 4000.0 ]' )
     swell_waves.set('patchnxny', '[ 2048, 2048 ]' )
+
+    print "************************************ swell_typicalheight_mult: ", swell_typicalheight_mult, " **************************************"
 
     swell_waves.set('typicalheight', wave_parms.get('swell_waves').get('typicalheight') * swell_typicalheight_mult)
     swell_waves.set('cuspscale', wave_parms.get('swell_waves').get('cuspscale') * swell_cuspscale_mult)
@@ -96,10 +100,13 @@ def CreateWaterSims(name, wave_parms, ewave_llc, ewave_patch_size):
     ewave_waves.set('llc', ewave_llc)
     ewave_waves.set('gravity',  9.8 )
     ewave_waves.set('depth', 10.0 )
-    ewave_waves.set('displacementscale', 0.3 )
+    # ewave_waves.set('displacementscale', 0.3 )
+    ewave_waves.set('displacementscale', displacementscale)
     ewave_waves.set('dohorizontal', True)
-    ewave_waves.set('sourcescale', 1.0 )
-    ewave_waves.set('ambientscale', 0.75*0.3 )
+    # ewave_waves.set('sourcescale', 1.0 )
+    ewave_waves.set('sourcescale', sourcescale)
+    # ewave_waves.set('ambientscale', 0.75*0.3 )
+    ewave_waves.set('ambientscale', ambientscale)
 
 ### ewave parms
     # ewave_waves.set('capillary', 0.015)
@@ -133,7 +140,7 @@ def RetrieveThingInWater(f):
 #
 
 
-def sim(input_frange, wave_parms, ewave_llc, ewave_patch_size, simstart):
+def sim(input_frange, wave_parms, ewave_llc, ewave_patch_size, simstart, ambientscale, sourcescale, displacementscale, substep):
     beginJob()
 
     # thirsty.FPS = 30.0
@@ -146,7 +153,7 @@ def sim(input_frange, wave_parms, ewave_llc, ewave_patch_size, simstart):
     thirsty.F = 1
     # thirsty.F = simstart
 
-    simscene = CreateWaterSims('water floating', wave_parms, ewave_llc, ewave_patch_size)
+    simscene = CreateWaterSims('water floating', wave_parms, ewave_llc, ewave_patch_size, ambientscale, sourcescale, displacementscale)
     simscene.set('frame', 'thirsty.F' )
 
 
@@ -177,10 +184,10 @@ def sim(input_frange, wave_parms, ewave_llc, ewave_patch_size, simstart):
     frame_list = frame_range.frames
     floatingThing_name = WATERTHING.split('/')[-1]
 
-    # start_ewave_time = 1 + time_offset
+    start_ewave_time = 1 + time_offset
     # start_ewave_time = simstart + time_offset
-    for f in range(1, frame_range.end + 1):
-    # for f in xrange(start_ewave_time, frame_range.end + 1):
+    # for f in range(1, frame_range.end + 1):
+    for f in xrange(start_ewave_time, frame_range.end + 1):
         LogIt(__file__, colors.color_magenta + "\n\n********************************** F R A M E  " + str(f) + " *****************************************\n" + colors.color_white)
         thirsty.F = int(f)
         LogIt(__file__, colors.color_yellow + "\n\n\tS I M U L A T I O N\n" + colors.color_white)
@@ -193,7 +200,13 @@ def sim(input_frange, wave_parms, ewave_llc, ewave_patch_size, simstart):
         water_thing = RetrieveThingInWater(obj_time)
         ew.set('height_source_geom', water_thing)
         ew.set('compute_height_source', True)
-        ew.update(timestep)
+
+        subtimestep = float(timestep) / substep
+
+        for step in xrange(substep):
+            LogIt(__file__, colors.color_blue + "\n\n\tS I M U L A T I O N" + " step " + str(step) + " START \n" + colors.color_white)
+            ew.update(subtimestep)
+
         LogIt(__file__, colors.color_yellow + "\n\n\tS I M U L A T I O N   F I N I S H E D\n" + colors.color_white)
         if f in frame_list:
             ew.write_displacement(os.path.join(PRODUCTSPATH, 'sim/{name}_ewave_{waterthing}.{f}.exr'.format(name=PRODNAME, waterthing=floatingThing_name, f=util.formattedFrame(f))))
@@ -230,7 +243,11 @@ def get_argvs():
                         default=0.015)
     parser.add_argument('-trimalpha', type=float, dest='trimalpha', help='Input Maya ewave simulation trimalpha',
                         default=0.05)
-    parser.add_argument('-simstart', type=int, dest='simstart', help='Sim start time.')
+    parser.add_argument('-simstart', type=int, dest='simstart', help='Input obj start time.', default=1)
+    parser.add_argument('-substep', type=int, dest='substep', help='Input sub step.', default=1)
+    parser.add_argument('-ambientscale', type=float, dest='ambientscale', help='Input ewave ambientscale.', default=0.225)
+    parser.add_argument('-sourcescale', type=float, dest='sourcescale', help='Input ewave sourcescale.', default=1.0)
+    parser.add_argument('-displacementscale', type=float, dest='displacementscale', help='Input ewave displacementscale.', default=0.3)
 
     args = parser.parse_args()
 
@@ -276,13 +293,23 @@ if __name__ == '__main__':
     time_offset = args.timeoffset
     ewave_capillary = args.capillary
     ewave_trimalpha = args.trimalpha
+    ambientscale = args.ambientscale
+    displacementscale = args.displacementscale
+    sourcescale = args.sourcescale
+
+    substep = args.substep
 
     print "swell_cuspscale_mult: ", swell_cuspscale_mult
     print "swell_typicalheight_mult: ", swell_typicalheight_mult
     print "time_offset: ", time_offset
     print "ewave_capillary: ", ewave_capillary
     print "ewave_trimalpha: ", ewave_trimalpha
+    print "ewave_ambientscale: ", ambientscale
+    print "ewave_displacementscale: ", displacementscale
+    print "ewave_sourcescale: ", sourcescale
+
     print "simstart: ", SIMSTART
+    print "substep: ", substep
 
     # do simulation and export displacement map for swell/small/ewave sim
-    sim(input_frange, wave_parms, LLC, PATCHSIZE, SIMSTART)
+    sim(input_frange, wave_parms, LLC, PATCHSIZE, SIMSTART, ambientscale, sourcescale, displacementscale, substep)
